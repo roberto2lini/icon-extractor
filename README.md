@@ -22,7 +22,7 @@ A Python utility to extract high-resolution icons from macOS PKG installers and 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/icon-extractor.git
+git clone https://github.com/roberto2lini/icon-extractor
 cd icon-extractor
 ```
 
