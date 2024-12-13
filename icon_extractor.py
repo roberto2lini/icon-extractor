@@ -321,17 +321,86 @@ class IconExtractor:
         finally:
             self.cleanup()
 
-def main():
-    if len(sys.argv) != 3:
-        print("Usage: python icon_extractor.py <input_dmg_or_pkg> <output_icns_path>")
-        sys.exit(1)
+    def process_directory(self, input_dir, output_dir):
+        """Process all PKG and DMG files in a directory"""
+        if not os.path.exists(input_dir):
+            raise Exception(f"Input directory does not exist: {input_dir}")
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Track success and failures
+        results = {
+            'successful': [],
+            'failed': []
+        }
+        
+        # Find all PKG and DMG files
+        for root, _, files in os.walk(input_dir):
+            for file in files:
+                if file.lower().endswith(('.pkg', '.dmg')):
+                    input_path = os.path.join(root, file)
+                    
+                    # Create output filename
+                    base_name = os.path.splitext(file)[0]
+                    output_path = os.path.join(output_dir, f"{base_name}.png")
+                    
+                    print(f"\nProcessing: {input_path}")
+                    try:
+                        self.extract_icon(input_path, output_path)
+                        results['successful'].append({
+                            'input': input_path,
+                            'output': output_path
+                        })
+                    except Exception as e:
+                        print(f"Failed to process {input_path}: {str(e)}")
+                        results['failed'].append({
+                            'input': input_path,
+                            'error': str(e)
+                        })
+        
+        # Print summary
+        print("\nProcessing Summary:")
+        print(f"Successfully processed: {len(results['successful'])} files")
+        print(f"Failed to process: {len(results['failed'])} files")
+        
+        if results['successful']:
+            print("\nSuccessfully processed files:")
+            for item in results['successful']:
+                print(f"  {item['input']} -> {item['output']}")
+        
+        if results['failed']:
+            print("\nFailed to process files:")
+            for item in results['failed']:
+                print(f"  {item['input']}: {item['error']}")
+                
+        return results
 
-    input_path = sys.argv[1]
-    output_path = sys.argv[2]
+def main():
+    if len(sys.argv) not in [3, 4]:
+        print("""Usage: 
+    Single file:   python icon_extractor.py <input_dmg_or_pkg> <output_icns_path>
+    Directory:     python icon_extractor.py --dir <input_directory> <output_directory>""")
+        sys.exit(1)
 
     extractor = IconExtractor()
     try:
-        extractor.extract_icon(input_path, output_path)
+        if sys.argv[1] == '--dir':
+            if len(sys.argv) != 4:
+                print("For directory processing, please provide both input and output directories")
+                sys.exit(1)
+            input_dir = sys.argv[2]
+            output_dir = sys.argv[3]
+            results = extractor.process_directory(input_dir, output_dir)
+            
+            # Exit with error if any failures occurred
+            if results['failed']:
+                sys.exit(1)
+        else:
+            input_path = sys.argv[1]
+            output_path = sys.argv[2]
+            extractor.extract_icon(input_path, output_path)
+            
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)
