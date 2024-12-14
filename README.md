@@ -9,8 +9,8 @@ A Python utility to extract high-resolution icons from macOS PKG installers and 
 - 🗂️ Batch processing of entire directories
 - 🖼️ Automatic conversion to PNG with optimal resolution
 - 📝 Detailed progress and error reporting
-- 🔍 Maintains highest available resolution (typically 512x512 or 1024x1024)
-- 📐 Option to resize icons to specific dimensions while maintaining aspect ratio
+- 🔍 Maintains high quality 300x300 output
+- 🐞 Debug mode for detailed logging
 
 ## 🛠️ Requirements
 
@@ -40,7 +40,7 @@ pip install Pillow
 
 ### 🎯 Extract icon from a single file
 
-```
+```bash
 # 🖼️ Extract to PNG (recommended)
 python3 icon_extractor.py input.pkg output.png
 
@@ -52,12 +52,19 @@ python3 icon_extractor.py input.dmg output.png
 
 # 🌐 Extract from URL
 python3 icon_extractor.py https://zoom.us/client/latest/zoomusInstallerFull.pkg zoom_icon.png
+
+# 🐞 Run with debug output
+python3 icon_extractor.py --debug input.pkg output.png
 ```
 
 ### 📂 Process an entire directory
 
 ```bash
+# Normal processing
 python3 icon_extractor.py --dir input_directory output_directory
+
+# With debug output
+python3 icon_extractor.py --debug --dir input_directory output_directory
 ```
 
 This will:
@@ -69,20 +76,25 @@ This will:
 
 ### 🎥 Extract Zoom icon
 ```bash
+# Normal extraction
 python3 icon_extractor.py zoomusInstallerFull.pkg zoom_icon.png
+
+# With debug output
+python3 icon_extractor.py --debug zoomusInstallerFull.pkg zoom_icon.png
 ```
 
 ### 📚 Process multiple installers
 ```bash
+# Normal processing
 python3 icon_extractor.py --dir ~/Downloads/Installers ~/Desktop/Icons
+
+# With debug output
+python3 icon_extractor.py --debug --dir ~/Downloads/Installers ~/Desktop/Icons
 ```
 
 ### 📝 Sample Output
 ```
 Processing: /Downloads/Installers/zoomusInstallerFull.pkg
-Created temporary directory: /tmp/pkg_extract_20241213_164740
-Attempting to extract PKG using xar: zoomusInstallerFull.pkg
-Found nested PKG directory: /tmp/pkg_extract_20241213_164740/zoomus.pkg
 Converting .icns to .png using sips...
 Icon successfully extracted to: /Desktop/Icons/zoom_icon.png
 
@@ -94,15 +106,29 @@ Successfully processed files:
   /Downloads/Installers/zoomusInstallerFull.pkg -> /Desktop/Icons/zoom_icon.png
 ```
 
+With `--debug` flag, you'll see additional information:
+```
+Processing: /Downloads/Installers/zoomusInstallerFull.pkg
+Created temporary directory: /tmp/pkg_extract_20241213_164740
+Attempting to extract PKG using xar: zoomusInstallerFull.pkg
+Found nested PKG directory: /tmp/pkg_extract_20241213_164740/zoomus.pkg
+Searching for .app bundle in: /tmp/pkg_extract_20241213_164740
+Checking directory: /tmp/pkg_extract_20241213_164740/zoomus.pkg
+Found .app bundle: /tmp/pkg_extract_20241213_164740/zoomus.app
+Converting .icns to .png using sips...
+Icon successfully extracted to: /Desktop/Icons/zoom_icon.png
+Preserving temporary directory for debugging: /tmp/pkg_extract_20241213_164740
+```
+
 ## 📄 Supported File Types
 
 - 📦 PKG installers (including nested PKG files)
 - 💿 DMG disk images
-- 🎨 Outputs to either PNG (with optional resizing) or original ICNS format
+- 🎨 Outputs to either PNG (300x300) or original ICNS format
 
 ## ⚠️ Error Handling
 
-The script provides detailed error messages and creates a summary when processing multiple files. Failed extractions don't stop the batch process, and a final report shows both successful and failed operations.
+The script provides detailed error messages and creates a summary when processing multiple files. Failed extractions don't stop the batch process, and a final report shows both successful and failed operations. Use the `--debug` flag for detailed error traces and preserved temporary files for debugging.
 
 ## 🤝 Contributing
 
@@ -122,8 +148,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Ensure the package contains an application bundle
 - Check if the package is properly formatted
 - Verify the package is not corrupted
+- Run with `--debug` flag to see detailed extraction process
 
 ### Conversion failed
 - Ensure `sips` and `iconutil` are available on your system
 - Check if you have proper permissions
 - Try installing Pillow for alternative conversion method
+- Use `--debug` flag to preserve temporary files for inspection

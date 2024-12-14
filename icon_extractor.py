@@ -12,10 +12,11 @@ import urllib.request
 import urllib.parse
 
 class IconExtractor:
-    def __init__(self):
+    def __init__(self, debug=False):
         self.temp_dir = None
         self.mount_point = None
         self.downloaded_file = None
+        self.debug = debug
 
     def cleanup(self):
         """Clean up temporary files and mounts"""
@@ -33,17 +34,22 @@ class IconExtractor:
                     pass
                 
         except Exception as e:
-            print(f"Warning: Error during unmount: {e}")
+            if self.debug:
+                print(f"Warning: Error during unmount: {e}")
         
         # Clean up downloaded file if it exists
         if self.downloaded_file and os.path.exists(self.downloaded_file):
             try:
                 os.remove(self.downloaded_file)
             except Exception as e:
-                print(f"Warning: Error cleaning up downloaded file: {e}")
+                if self.debug:
+                    print(f"Warning: Error cleaning up downloaded file: {e}")
 
-        if self.temp_dir and os.path.exists(self.temp_dir):
+        # Only preserve temp directory if in debug mode
+        if self.debug and self.temp_dir and os.path.exists(self.temp_dir):
             print(f"\nPreserving temporary directory for debugging: {self.temp_dir}")
+        elif self.temp_dir and os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def download_file(self, url):
         """Download a file from URL and return the local path"""
@@ -194,14 +200,17 @@ class IconExtractor:
 
     def find_app_in_directory(self, directory):
         """Find the first .app bundle in a directory"""
-        print(f"Searching for .app bundle in: {directory}")
+        if self.debug:
+            print(f"Searching for .app bundle in: {directory}")
         for root, dirs, files in os.walk(directory):
-            print(f"Checking directory: {root}")
+            if self.debug:
+                print(f"Checking directory: {root}")
             # Check for .app directories
             for dir in dirs:
                 if dir.endswith('.app'):
                     full_path = os.path.join(root, dir)
-                    print(f"Found .app bundle: {full_path}")
+                    if self.debug:
+                        print(f"Found .app bundle: {full_path}")
                     return full_path
             # Check for .app files
             for file in files:
@@ -256,7 +265,12 @@ class IconExtractor:
             # First try using sips (macOS)
             print("Converting .icns to .png using sips...")
             result = subprocess.run(
-                ['sips', '-s', 'format', 'png', icns_path, '--out', png_path],
+                ['sips', '-s', 'format', 'png', '--out', png_path,
+                 # Add quality settings for sips
+                 '-s', 'formatOptions', 'best',
+                 # Set size to 300x300 max
+                 '-Z', '300',
+                 icns_path],
                 capture_output=True,
                 text=True
             )
@@ -291,13 +305,17 @@ class IconExtractor:
                                 largest_file = img_path
                 
                 if largest_file:
-                    # Open and resize the largest image
                     with Image.open(largest_file) as img:
-                        # Calculate new size maintaining aspect ratio
+                        # Calculate new size maintaining aspect ratio with 300x300 max
                         ratio = min(300/img.width, 300/img.height)
                         new_size = (int(img.width * ratio), int(img.height * ratio))
                         resized_img = img.resize(new_size, Image.Resampling.LANCZOS)
-                        resized_img.save(png_path, 'PNG')
+                        
+                        # Save with optimal settings
+                        resized_img.save(png_path, 'PNG', 
+                                       optimize=True,
+                                       quality=95,  # High quality
+                                       compress_level=6)  # Balanced compression
                     print(f"Converted icon to PNG using PIL: {png_path}")
                     
                 # Cleanup
@@ -428,38 +446,39 @@ class IconExtractor:
         return results
 
 def main():
-    if len(sys.argv) not in [3, 4]:
-        print("""Usage: 
-    Single file:   python icon_extractor.py <input_dmg_or_pkg> <output_icns_path>
-    URL:           python icon_extractor.py <url_to_pkg_or_dmg> <output_icns_path>
-    Directory:     python icon_extractor.py --dir <input_directory> <output_directory>
+    import argparse
+    parser = argparse.ArgumentParser(description='Extract icons from DMG or PKG files')
     
-Examples:
-    python icon_extractor.py input.pkg output.png
-    python icon_extractor.py https://zoom.us/client/latest/zoomusInstallerFull.pkg zoom_icon.png
-    python icon_extractor.py --dir ~/Downloads/Installers ~/Desktop/Icons""")
-        sys.exit(1)
+    # Add mutually exclusive group for input type
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument('--dir', help='Process all PKG and DMG files in directory')
+    input_group.add_argument('input', nargs='?', help='Input DMG/PKG file or URL')
+    
+    parser.add_argument('output', help='Output path (.png or .icns)')
+    parser.add_argument('--debug', action='store_true', help='Enable debug output')
+    
+    args = parser.parse_args()
 
-    extractor = IconExtractor()
+    extractor = IconExtractor(debug=args.debug)
     try:
-        if sys.argv[1] == '--dir':
-            if len(sys.argv) != 4:
-                print("For directory processing, please provide both input and output directories")
+        if args.dir:
+            if not args.output:
+                print("For directory processing, please provide output directory")
                 sys.exit(1)
-            input_dir = sys.argv[2]
-            output_dir = sys.argv[3]
-            results = extractor.process_directory(input_dir, output_dir)
+            results = extractor.process_directory(args.dir, args.output)
             
             # Exit with error if any failures occurred
             if results['failed']:
                 sys.exit(1)
         else:
-            input_path = sys.argv[1]
-            output_path = sys.argv[2]
-            extractor.extract_icon(input_path, output_path)
+            extractor.extract_icon(args.input, args.output)
             
     except Exception as e:
         print(f"Error: {e}")
+        if args.debug:
+            import traceback
+            print("\nDebug traceback:")
+            traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":
