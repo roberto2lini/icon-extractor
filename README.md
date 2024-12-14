@@ -1,4 +1,4 @@
-# 🎨 Icon Extractor
+# 🎨 macOS PKG & DMG Icon Extractor
 
 A Python utility to extract high-resolution icons from macOS PKG installers and DMG files. The script can process individual files or entire directories, converting icons to PNG format while maintaining the best possible quality. ✨
 
