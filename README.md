@@ -49,6 +49,9 @@ python3 icon_extractor.py input.pkg output.icns
 
 # 💿 Extract from DMG
 python3 icon_extractor.py input.dmg output.png
+
+# 🌐 Extract from URL
+python3 icon_extractor.py https://zoom.us/client/latest/zoomusInstallerFull.pkg zoom_icon.png
 ```
 
 ### 📂 Process an entire directory

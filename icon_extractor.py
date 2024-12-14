@@ -8,11 +8,14 @@ import shutil
 import tempfile
 from pathlib import Path
 import datetime
+import urllib.request
+import urllib.parse
 
 class IconExtractor:
     def __init__(self):
         self.temp_dir = None
         self.mount_point = None
+        self.downloaded_file = None
 
     def cleanup(self):
         """Clean up temporary files and mounts"""
@@ -32,8 +35,52 @@ class IconExtractor:
         except Exception as e:
             print(f"Warning: Error during unmount: {e}")
         
+        # Clean up downloaded file if it exists
+        if self.downloaded_file and os.path.exists(self.downloaded_file):
+            try:
+                os.remove(self.downloaded_file)
+            except Exception as e:
+                print(f"Warning: Error cleaning up downloaded file: {e}")
+
         if self.temp_dir and os.path.exists(self.temp_dir):
             print(f"\nPreserving temporary directory for debugging: {self.temp_dir}")
+
+    def download_file(self, url):
+        """Download a file from URL and return the local path"""
+        try:
+            print(f"Downloading file from: {url}")
+            
+            # Create temporary directory for downloads if it doesn't exist
+            download_dir = os.path.join(tempfile.gettempdir(), 'icon_extractor_downloads')
+            os.makedirs(download_dir, exist_ok=True)
+            
+            # Get filename from URL or generate one
+            filename = os.path.basename(urllib.parse.urlparse(url).path)
+            if not filename:
+                filename = f"download_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+            # Ensure file has correct extension
+            if url.lower().endswith('.pkg'):
+                filename = filename if filename.lower().endswith('.pkg') else filename + '.pkg'
+            elif url.lower().endswith('.dmg'):
+                filename = filename if filename.lower().endswith('.dmg') else filename + '.dmg'
+            
+            local_path = os.path.join(download_dir, filename)
+            
+            # Download with progress indicator
+            print("Downloading: ", end='', flush=True)
+            def progress(count, block_size, total_size):
+                percent = int(count * block_size * 100 / total_size)
+                print(f"\rDownloading: {percent}%", end='', flush=True)
+            
+            urllib.request.urlretrieve(url, local_path, reporthook=progress)
+            print("\nDownload complete!")
+            
+            self.downloaded_file = local_path
+            return local_path
+            
+        except Exception as e:
+            raise Exception(f"Failed to download file: {str(e)}")
 
     def mount_dmg(self, dmg_path):
         """Mount a DMG and return the mount point"""
@@ -266,6 +313,10 @@ class IconExtractor:
     def extract_icon(self, input_path, output_path):
         """Main method to extract icon from DMG or PKG"""
         try:
+            # Check if input is a URL
+            if input_path.lower().startswith(('http://', 'https://')):
+                input_path = self.download_file(input_path)
+
             if not os.path.exists(input_path):
                 raise Exception(f"Input file does not exist: {input_path}")
 
@@ -380,7 +431,13 @@ def main():
     if len(sys.argv) not in [3, 4]:
         print("""Usage: 
     Single file:   python icon_extractor.py <input_dmg_or_pkg> <output_icns_path>
-    Directory:     python icon_extractor.py --dir <input_directory> <output_directory>""")
+    URL:           python icon_extractor.py <url_to_pkg_or_dmg> <output_icns_path>
+    Directory:     python icon_extractor.py --dir <input_directory> <output_directory>
+    
+Examples:
+    python icon_extractor.py input.pkg output.png
+    python icon_extractor.py https://zoom.us/client/latest/zoomusInstallerFull.pkg zoom_icon.png
+    python icon_extractor.py --dir ~/Downloads/Installers ~/Desktop/Icons""")
         sys.exit(1)
 
     extractor = IconExtractor()
